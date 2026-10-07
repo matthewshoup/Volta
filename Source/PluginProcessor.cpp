@@ -1,0 +1,15 @@
+#include "PluginProcessor.h"
+#include "PluginEditor.h"
+VoltaAudioProcessor::VoltaAudioProcessor():AudioProcessor(BusesProperties().withOutput("Output",juce::AudioChannelSet::stereo(),true)),apvts(*this,nullptr,"PARAMETERS",layout()){
+ for(int i=0;i<12;++i)synth.addVoice(new VoltaVoice());synth.addSound(new VoltaSound());
+}
+juce::AudioProcessorValueTreeState::ParameterLayout VoltaAudioProcessor::layout(){juce::AudioProcessorValueTreeState::ParameterLayout l;
+ l.add(std::make_unique<juce::AudioParameterFloat>("mix","Osc Mix",0,1,.5f));l.add(std::make_unique<juce::AudioParameterFloat>("detune","Detune",0,30,7));
+ l.add(std::make_unique<juce::AudioParameterFloat>("cutoff","Cutoff",juce::NormalisableRange<float>(40,18000,1,.28f),2200));l.add(std::make_unique<juce::AudioParameterFloat>("res","Resonance",.1f,1.25f,.35f));
+ l.add(std::make_unique<juce::AudioParameterFloat>("attack","Attack",.001f,3,.01f));l.add(std::make_unique<juce::AudioParameterFloat>("decay","Decay",.01f,4,.35f));l.add(std::make_unique<juce::AudioParameterFloat>("sustain","Sustain",0,1,.72f));l.add(std::make_unique<juce::AudioParameterFloat>("release","Release",.01f,8,.8f));
+ l.add(std::make_unique<juce::AudioParameterFloat>("tube","Tube Drive",0,1,.3f));l.add(std::make_unique<juce::AudioParameterFloat>("iron","Iron",0,1,.25f));l.add(std::make_unique<juce::AudioParameterFloat>("voltage","Voltage",0,1,.35f));return l;}
+void VoltaAudioProcessor::prepareToPlay(double sr,int bs){synth.setCurrentPlaybackSampleRate(sr);for(int i=0;i<synth.getNumVoices();++i)if(auto*v=dynamic_cast<VoltaVoice*>(synth.getVoice(i)))v->prepare(sr,bs);}
+bool VoltaAudioProcessor::isBusesLayoutSupported(const BusesLayout& l)const{return l.getMainOutputChannelSet()==juce::AudioChannelSet::mono()||l.getMainOutputChannelSet()==juce::AudioChannelSet::stereo();}
+void VoltaAudioProcessor::processBlock(juce::AudioBuffer<float>& b,juce::MidiBuffer&m){b.clear();float mix=apvts.getRawParameterValue("mix")->load(),det=apvts.getRawParameterValue("detune")->load(),cut=apvts.getRawParameterValue("cutoff")->load(),res=apvts.getRawParameterValue("res")->load(),a=apvts.getRawParameterValue("attack")->load(),d=apvts.getRawParameterValue("decay")->load(),s=apvts.getRawParameterValue("sustain")->load(),r=apvts.getRawParameterValue("release")->load(),t=apvts.getRawParameterValue("tube")->load(),ir=apvts.getRawParameterValue("iron")->load(),v=apvts.getRawParameterValue("voltage")->load();for(int i=0;i<synth.getNumVoices();++i)if(auto*voice=dynamic_cast<VoltaVoice*>(synth.getVoice(i)))voice->setParams(mix,det,cut,res,a,d,s,r,t,ir,v);synth.renderNextBlock(b,m,0,b.getNumSamples());}
+void VoltaAudioProcessor::getStateInformation(juce::MemoryBlock&d){auto x=apvts.copyState().createXml();copyXmlToBinary(*x,d);}void VoltaAudioProcessor::setStateInformation(const void*d,int n){auto x=getXmlFromBinary(d,n);if(x)apvts.replaceState(juce::ValueTree::fromXml(*x));}
+juce::AudioProcessorEditor* VoltaAudioProcessor::createEditor(){return new VoltaAudioProcessorEditor(*this);}juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter(){return new VoltaAudioProcessor();}
